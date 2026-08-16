@@ -1,0 +1,16 @@
+# local config holds your watchlist + recipient; keep it out of git
+config.yaml
+
+# secrets / local env
+.env
+run.sh
+
+# generated output
+digest_preview.html
+hibid_dump.html
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/

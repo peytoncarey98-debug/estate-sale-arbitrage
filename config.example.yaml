@@ -1,0 +1,29 @@
+# Copy this file to config.yaml and edit it.
+# config.yaml is gitignored and never committed.
+
+# Keywords to hunt for on HiBid. Each becomes its own search.
+watchlist:
+  - roseville pottery
+  - hummel figurine
+  - griswold cast iron
+  - vintage pyrex
+  - sterling silver flatware
+
+# A lot is flagged only when BOTH conditions are true:
+thresholds:
+  # eBay median sold price must be at least this multiple of the current bid
+  min_value_ratio: 3.0
+  # ...and estimated profit (eBay median - current bid) must be at least this many dollars
+  min_margin_dollars: 40
+
+# How many HiBid result pages to scan per keyword (~25 lots per page)
+hibid_pages_per_keyword: 2
+
+ebay:
+  min_comp_price: 5     # ignore sold comps below this (junk/noise)
+  max_comps: 20         # use at most this many recent comps for the median
+
+email:
+  to: "peyton.carey98@gmail.com"
+  subject_prefix: "[Estate Arb]"
+  flagged_only: true    # reserved for future use; v1 only reports flagged lots
