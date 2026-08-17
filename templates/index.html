@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lot Scout</title>
+<style>
+  :root{
+    --ink:#221E1A; --ink-soft:#5a524a;
+    --paper:#EDEAE3; --surface:#FBFAF7; --line:#DAD5CB;
+    --burgundy:#803033; --burgundy-deep:#642528;
+    --brass:#9A7A2E; --emerald:#1E6B4B; --emerald-soft:#e7efe8;
+    --gold-soft:#f3ecd8; --watch:#8b8378; --watch-soft:#ece9e2;
+    --shadow:0 1px 2px rgba(34,30,26,.05), 0 6px 20px rgba(34,30,26,.06);
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui);
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 64px}
+  a{color:var(--burgundy)}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .mark{font-family:var(--serif);font-size:29px;font-weight:700;letter-spacing:.02em}
+  .tag{font-size:13px;color:var(--ink-soft);max-width:36ch}
+  .topright{font-size:13px;color:var(--ink-soft)}
+
+  .notice{background:var(--gold-soft);border:1px solid #e3d6ad;border-radius:11px;
+    padding:11px 14px;font-size:13.5px;color:var(--burgundy-deep);margin-bottom:18px}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:18px 18px 20px;margin-bottom:24px}
+  .panel h2{margin:0 0 10px;font-size:12px;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--ink-soft);font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);
+    border-radius:999px;padding:6px 8px 6px 13px;font-size:14px}
+  .chip button{border:0;background:var(--watch-soft);color:var(--ink-soft);width:20px;height:20px;
+    border-radius:50%;cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;padding:0}
+  .chip button:hover{background:var(--burgundy);color:#fff}
+  .addrow{display:flex;gap:8px;max-width:440px}
+  input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:#fff;
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  input:focus,select:focus{outline:2px solid var(--burgundy);outline-offset:1px;border-color:var(--burgundy)}
+  input[type=text]{flex:1}
+  input::placeholder{color:#a79f95}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:9px;
+    padding:9px 14px;font:inherit;cursor:pointer}
+  .ghost:hover{border-color:var(--burgundy);color:var(--burgundy)}
+
+  .controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px;margin-top:18px;
+    padding-top:16px;border-top:1px dashed var(--line)}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .field input[type=number]{width:120px}
+  .seg{display:inline-flex;background:#fff;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:13px;
+    padding:8px 14px;border-radius:7px;cursor:pointer}
+  .seg button.on{background:var(--burgundy);color:#fff;font-weight:600}
+  .scan{margin-left:auto;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  .scan .hint{font-size:11.5px;color:var(--brass);min-height:14px}
+  .scan button{background:var(--burgundy);color:#fff;border:0;border-radius:10px;
+    padding:12px 22px;font:inherit;font-weight:600;font-size:15px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:9px;box-shadow:0 1px 0 var(--burgundy-deep)}
+  .scan button:hover{background:var(--burgundy-deep)}
+  .scan button:disabled{opacity:.7;cursor:default}
+  .spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:6px 0 26px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+  .stat .v{font-family:var(--serif);font-size:29px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .stat .v small{font-family:var(--ui);font-size:13px;font-weight:500;color:var(--ink-soft)}
+  .stat.accent .v{color:var(--emerald)}
+
+  .group{margin:0 0 26px}
+  .group-head{display:flex;align-items:baseline;gap:10px;margin:0 2px 12px;
+    padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .group-head h3{margin:0;font-family:var(--serif);font-size:20px;font-weight:700}
+  .group-head .count{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
+  .group-head .gerr{font-size:12.5px;color:var(--burgundy)}
+
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;
+    box-shadow:var(--shadow);padding:15px 16px;display:flex;flex-direction:column;gap:12px;
+    border-left:4px solid var(--line)}
+  .card.hot{border-left-color:var(--emerald)}
+  .card.good{border-left-color:var(--brass)}
+  .card.watch{border-left-color:var(--watch)}
+  .card.none{border-left-color:var(--line)}
+  .card .eyebrow{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.04em;color:var(--ink-soft)}
+  .card .lotno{color:var(--brass);font-weight:600}
+  .card h4{margin:0;font-family:var(--serif);font-size:18px;font-weight:600;line-height:1.25;text-wrap:balance}
+  .card h4 a{color:inherit;text-decoration:none}
+  .card h4 a:hover{color:var(--burgundy);text-decoration:underline}
+  .src{text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;color:var(--brass);font-weight:600}
+  .signal{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    padding:3px 9px;border-radius:999px}
+  .signal.hot{background:var(--emerald-soft);color:var(--emerald)}
+  .signal.good{background:var(--gold-soft);color:var(--burgundy-deep)}
+  .signal.watch{background:var(--watch-soft);color:var(--watch)}
+  .signal.none{background:var(--watch-soft);color:var(--ink-soft)}
+
+  .figs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-variant-numeric:tabular-nums}
+  .figs .cell .lab{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+  .figs .cell .num{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:1px}
+  .figs .cell.mar .num{color:var(--emerald)}
+
+  .gauge{height:7px;border-radius:99px;background:var(--watch-soft);overflow:hidden}
+  .gauge span{display:block;height:100%;border-radius:99px}
+  .gauge span.hot{background:var(--emerald)} .gauge span.good{background:var(--brass)} .gauge span.watch{background:var(--watch)}
+  .upside{font-size:11.5px;color:var(--ink-soft);margin-top:-4px}
+  .upside b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding-top:11px;border-top:1px solid var(--line);font-size:13px}
+  .meta{color:var(--ink-soft)}
+  .meta .clock{font-family:var(--mono)}
+  .links a{text-decoration:none;font-weight:600}
+  .links a:hover{text-decoration:underline}
+
+  .list{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+  .list-head,.row{display:grid;grid-template-columns:minmax(0,1fr) 72px 72px 78px 60px 66px 116px;
+    align-items:center;gap:14px;padding:10px 15px}
+  .list-head{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:600;background:#fff;border-bottom:1px solid var(--line)}
+  .list-head .r{text-align:right}
+  .row{border-top:1px solid var(--line);border-left:3px solid var(--line);font-variant-numeric:tabular-nums}
+  .row:first-of-type{border-top:0}
+  .row.hot{border-left-color:var(--emerald)} .row.good{border-left-color:var(--brass)}
+  .row.watch{border-left-color:var(--watch)} .row.none{border-left-color:var(--line)}
+  .row .t{display:flex;align-items:center;gap:9px;min-width:0}
+  .row .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--line)}
+  .row .dot.hot{background:var(--emerald)} .row .dot.good{background:var(--brass)} .row .dot.watch{background:var(--watch)}
+  .row .ln{color:var(--brass);font-family:var(--mono);font-size:11px;flex:none}
+  .row .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  a.name{color:var(--ink);text-decoration:none}
+  a.name:hover{color:var(--burgundy);text-decoration:underline}
+  .row .r{text-align:right;font-family:var(--mono);font-size:14px}
+  .row .r.mar{color:var(--emerald);font-weight:600}
+  .row .r.up.hot{color:var(--emerald);font-weight:600} .row .r.up.good{color:var(--brass);font-weight:600} .row .r.up.watch{color:var(--watch)}
+  .row .lk{text-align:right;white-space:nowrap;font-size:12.5px}
+  .row .lk a{font-weight:600;text-decoration:none} .row .lk a:hover{text-decoration:underline}
+  @media (max-width:720px){
+    .list-head{display:none}
+    .row{grid-template-columns:1fr 1fr;gap:5px 12px;padding:12px 14px}
+    .row .t{grid-column:1/-1}
+    .row .r{text-align:left}
+    .row .r::before{content:attr(data-l);display:block;font-family:var(--ui);font-size:9.5px;
+      letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft)}
+    .row .lk{grid-column:1/-1;text-align:left;margin-top:2px}
+    .stats{grid-template-columns:1fr}
+    .cards{grid-template-columns:1fr}
+    .scan{margin-left:0;width:100%;align-items:stretch}
+    .scan button{width:100%;justify-content:center}
+  }
+
+  .empty{color:var(--ink-soft);text-align:center;padding:40px;background:var(--surface);
+    border:1px dashed var(--line);border-radius:13px}
+  .pagenote{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:12.5px;color:var(--ink-soft);line-height:1.6}
+  @media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none!important}}
+  .reveal{animation:rise .4s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">Lot&nbsp;Scout</div>
+      <div class="tag">Underpriced collectible lots on HiBid, valued against eBay.</div>
+    </div>
+    {% if auth_on %}<div class="topright"><a href="{{ url_for('logout') }}">Sign out</a></div>{% endif %}
+  </header>
+
+  {% if not ebay_on %}
+  <div class="notice">Value estimates are <b>off</b> — add your eBay API key to turn them on.
+    Until then, each lot still links to its eBay sold listings for a manual check.</div>
+  {% endif %}
+
+  <section class="panel">
+    <h2>Watchlist</h2>
+    <div class="chips" id="chips"></div>
+    <div class="addrow">
+      <input type="text" id="kwInput" placeholder="Add a keyword — e.g. depression glass">
+      <button class="ghost" id="addBtn">Add</button>
+    </div>
+    <div class="controls">
+      <div class="field">
+        <label for="maxBid">Max current bid</label>
+        <input type="number" id="maxBid" value="150" min="0" step="10">
+      </div>
+      <div class="field">
+        <label for="sort">Sort by</label>
+        <select id="sort">
+          <option value="deal">Best deal</option>
+          <option value="ending">Ending soonest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>View</label>
+        <div class="seg" id="viewSeg">
+          <button data-v="cards" class="on">Cards</button>
+          <button data-v="list">List</button>
+        </div>
+      </div>
+      <div class="scan">
+        <span class="hint" id="hint"></span>
+        <button id="scanBtn"><span id="scanLabel">Scan HiBid</span></button>
+      </div>
+    </div>
+  </section>
+
+  <div id="results"><div class="empty">Add your keywords above, then hit <b>Scan HiBid</b>.</div></div>
+
+  <p class="pagenote">
+    “Est. value” is the median current eBay asking price for similar items — a market
+    signal, not a sold price, so treat it as a starting point and confirm condition and
+    completeness before bidding.
+  </p>
+</div>
+
+<script>
+const DEFAULT_WATCH = ["roseville pottery","griswold cast iron","hummel figurine","vintage pyrex","sterling silver flatware"];
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+
+let watch = LS.get("ls.watch", DEFAULT_WATCH.slice());
+let view  = LS.get("ls.view", "cards");
+let lastResults = null;
+
+const $ = id => document.getElementById(id);
+const money = n => (n==null ? "—" : "$"+Number(n).toLocaleString());
+const ebayUrl = t => "https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(t)+"&LH_Sold=1&LH_Complete=1&_sop=13";
+function clock(m){ if(m==null) return "—"; const d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;
+  return d?`${d}d ${h}h`:(h?`${h}h ${mm}m`:`${mm}m`); }
+function grade(l){
+  if(l.est==null||!l.bid) return {c:"none",label:"No comps"};
+  const r=l.est/l.bid, mar=l.est-l.bid;
+  if(r>=3&&mar>=40) return {c:"hot",label:"Strong deal"};
+  if(r>=1.8) return {c:"good",label:"Worth a look"};
+  return {c:"watch",label:"Marginal"};
+}
+function upside(l){ return (l.est!=null&&l.bid) ? Math.max(0,Math.round((l.est-l.bid)/l.est*100)) : null; }
+
+/* ---------- watchlist ---------- */
+function renderChips(){
+  const el=$("chips"); el.innerHTML="";
+  watch.forEach((k,i)=>{
+    const c=document.createElement("span"); c.className="chip";
+    c.appendChild(Object.assign(document.createElement("span"),{textContent:k}));
+    const b=document.createElement("button"); b.textContent="×"; b.title="Remove";
+    b.onclick=()=>{ watch.splice(i,1); persistWatch(); renderChips(); markDirty(); };
+    c.appendChild(b); el.appendChild(c);
+  });
+}
+function addKw(){
+  const inp=$("kwInput"); const v=inp.value.trim().toLowerCase();
+  if(v && !watch.includes(v)){ watch.push(v); persistWatch(); renderChips(); markDirty(); }
+  inp.value=""; inp.focus();
+}
+function persistWatch(){ LS.set("ls.watch", watch); }
+function markDirty(){ if(lastResults) $("hint").textContent="Changes pending — scan to refresh"; }
+
+/* ---------- scan ---------- */
+async function scan(){
+  if(!watch.length){ $("results").innerHTML=`<div class="empty">Add at least one keyword first.</div>`; return; }
+  const btn=$("scanBtn"), lab=$("scanLabel");
+  btn.disabled=true; lab.textContent="Scanning…"; $("hint").textContent="";
+  btn.insertAdjacentHTML("afterbegin",'<span class="spin" id="sp"></span>');
+  try{
+    const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({watchlist:watch, maxBid:$("maxBid").value, cap:20})});
+    if(res.status===401){ location.href="/login"; return; }
+    if(!res.ok) throw new Error("server "+res.status);
+    const data=await res.json();
+    lastResults=data.results;
+    render();
+  }catch(e){
+    $("results").innerHTML=`<div class="empty">Couldn't complete the scan (${e.message}).<br>
+      If this keeps happening, the server may be on a network HiBid is blocking.</div>`;
+  }finally{
+    $("sp")?.remove(); btn.disabled=false; lab.textContent="Scan HiBid";
+  }
+}
+
+/* ---------- render ---------- */
+function render(){
+  if(!lastResults){ return; }
+  const box=$("results");
+  const flat=lastResults.flatMap(g=>g.lots||[]);
+  if(!flat.length && !lastResults.some(g=>g.error)){
+    box.innerHTML=`<div class="empty">No lots matched. Try raising “Max current bid” or different keywords.</div>`; return;
+  }
+  const hot=flat.filter(l=>grade(l).c==="hot").length;
+  const withMar=flat.filter(l=>l.margin!=null);
+  const best=withMar.length?withMar.reduce((a,b)=>b.margin>a.margin?b:a):null;
+
+  let html=`<div class="stats reveal">
+    <div class="stat"><div class="k">Lots surfaced</div><div class="v">${flat.length}</div></div>
+    <div class="stat accent"><div class="k">Strong deals</div><div class="v">${hot}</div></div>
+    <div class="stat"><div class="k">Best margin</div><div class="v">${best?money(best.margin):"—"} ${best?`<small>${esc(best.title.split(",")[0])}</small>`:""}</div></div>
+  </div>`;
+
+  const sortVal=$("sort").value;
+  const sorter = sortVal==="ending"
+    ? (a,b)=>(a.mins??1e12)-(b.mins??1e12)
+    : (a,b)=>((b.margin??-1e12)-(a.margin??-1e12));
+
+  lastResults.forEach(g=>{
+    const lots=(g.lots||[]).slice().sort(sorter);
+    html+=`<div class="group reveal"><div class="group-head"><h3>${esc(g.keyword)}</h3>`;
+    if(g.error){ html+=`<span class="gerr">${esc(g.error)}</span>`; }
+    else{ html+=`<span class="count">${lots.length} lot${lots.length===1?"":"s"}</span>`; }
+    html+=`</div>`;
+    if(lots.length) html += view==="list" ? listMarkup(lots) : cardsMarkup(lots);
+    else if(!g.error) html+=`<div class="empty">Nothing under the current filters.</div>`;
+    html+=`</div>`;
+  });
+  box.innerHTML=html;
+}
+
+function cardsMarkup(lots){
+  let h=`<div class="cards">`;
+  lots.forEach(l=>{
+    const g=grade(l), up=upside(l), ratio=(l.est!=null&&l.bid)?(l.est/l.bid).toFixed(1):null;
+    h+=`<div class="card ${g.c}">
+      <div class="eyebrow"><span class="lotno">Lot ${esc(l.lot||"?")}</span><span>·</span><span>${l.bids??"—"} bids</span>
+        <span class="signal ${g.c}">${g.label}</span></div>
+      <h4><a href="${l.url||"#"}" target="_blank" rel="noopener">${esc(l.title)}</a></h4>
+      <div class="figs">
+        <div class="cell"><div class="lab">Current bid</div><div class="num">${money(l.bid)}</div></div>
+        <div class="cell val"><div class="lab">Est. value</div><div class="num">${money(l.est)}</div></div>
+        <div class="cell mar"><div class="lab">Margin</div><div class="num">${money(l.margin)}</div></div>
+      </div>
+      <div class="gauge"><span class="${g.c}" style="width:${up??0}%"></span></div>
+      <div class="upside">${up!=null?`<b>${up}%</b> under est. value · ${ratio}× the bid`:`No eBay match — check comps manually`}</div>
+      <div class="foot">
+        <span class="meta"><span class="clock">${clock(l.mins)}</span> left · <span class="src">${esc(l.source||"HiBid")}</span></span>
+        <span class="links"><a href="${l.ebayUrl}" target="_blank" rel="noopener">eBay sold ↗</a></span>
+      </div>
+    </div>`;
+  });
+  return h+`</div>`;
+}
+
+function listMarkup(lots){
+  let h=`<div class="list"><div class="list-head">
+    <span>Lot</span><span class="r">Bid</span><span class="r">Est</span><span class="r">Margin</span>
+    <span class="r">Under</span><span class="r">Ends</span><span class="r">Comps</span></div>`;
+  lots.forEach(l=>{
+    const g=grade(l), up=upside(l);
+    h+=`<div class="row ${g.c}">
+      <div class="t"><span class="dot ${g.c}"></span><span class="ln">#${esc(l.lot||"?")}</span>
+        <a class="name" href="${l.url||"#"}" target="_blank" rel="noopener" title="Open on ${esc(l.source||"HiBid")}">${esc(l.title)}</a></div>
+      <div class="r" data-l="Bid">${money(l.bid)}</div>
+      <div class="r" data-l="Est">${money(l.est)}</div>
+      <div class="r mar" data-l="Margin">${money(l.margin)}</div>
+      <div class="r up ${g.c}" data-l="Under">${up!=null?up+"%":"—"}</div>
+      <div class="r" data-l="Ends">${clock(l.mins)}</div>
+      <div class="lk"><a href="${l.ebayUrl}" target="_blank" rel="noopener">eBay sold ↗</a></div>
+    </div>`;
+  });
+  return h+`</div>`;
+}
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- wire up ---------- */
+$("addBtn").onclick=addKw;
+$("kwInput").addEventListener("keydown",e=>{ if(e.key==="Enter") addKw(); });
+$("scanBtn").onclick=scan;
+$("maxBid").addEventListener("change",markDirty);
+$("sort").value = LS.get("ls.sort","deal");
+$("sort").addEventListener("change",()=>{ LS.set("ls.sort",$("sort").value); if(lastResults) render(); });
+$("maxBid").value = LS.get("ls.maxbid",150);
+$("maxBid").addEventListener("change",()=>LS.set("ls.maxbid",$("maxBid").value));
+$("viewSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  view=b.dataset.v; LS.set("ls.view",view);
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle("on",x===b));
+  if(lastResults) render();
+});
+[...$("viewSeg").children].forEach(x=>x.classList.toggle("on",x.dataset.v===view));
+renderChips();
+</script>
+</body>
+</html>

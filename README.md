@@ -1,146 +1,83 @@
-# estate-sale-arbitrage
+# Lot Scout
 
-Find collectible values in estate-sale auctions online.
+A small hosted web app that finds underpriced collectible lots on **HiBid**
+auctions and values them against **eBay**. Open a link, edit your watchlist by
+clicking, hit **Scan**, and get lots ranked by how far under estimated value the
+current bid is — as cards or a dense list. No install for the people using it.
 
-This tool scans **HiBid.com** open auctions for the keywords on your watchlist
-and **emails you a digest** of matching lots — each with its current bid, number
-of bids, time left, a link to the lot, and a **one-click link to eBay's sold
-listings** so you can eyeball resale value and spot underpriced items. It runs on
-your own computer on a schedule.
+- **HiBid** is scanned server-side (browser-impersonating fetch; no eBay-style blocking).
+- **eBay valuation** uses eBay's **official Browse API** — sanctioned, never captcha-blocked, works from a server. It reports the median current *asking* price as a value signal.
+- **Stateless backend**: your watchlist lives in the browser and is sent with each scan, so there's no database and moving hosts is trivial.
 
-## How it works
+## Deploy it free (Render)
 
-```
-watchlist keywords ─► HiBid search ─► filter (cheap enough?) + sort ─► email digest
-                                                                          │
-                                        each lot links to its eBay SOLD comps
-```
+1. Push this repo to GitHub (already done) and create a free account at **render.com**.
+2. In Render: **New → Blueprint**, connect this repository. Render reads
+   `render.yaml` and configures everything.
+3. Set the environment variables it asks for:
+   - **`APP_PASSWORD`** — the shared password you and your girlfriend type to open the site. Pick anything.
+   - `EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET` — optional now; add them to turn on value estimates (see below). The app runs fine without them (each lot still links to its eBay sold search).
+   - `SECRET_KEY` is generated automatically — leave it.
+4. Click **Apply / Deploy**. In a few minutes you get a URL like
+   `https://lot-scout.onrender.com`. Open it, enter your password, and scan.
 
-### Why eBay value isn't automatic
+> On Render's free plan the site "sleeps" after ~15 min idle, so the first visit
+> after a while takes ~30–60s to wake. That's the only free-tier catch.
 
-eBay blocks automated access to sold prices (that data sits behind their paid
-Marketplace Insights API), and it blocks scraping hard — even a real browser from
-a home connection gets refused. Rather than fight that, the digest gives you a
-**one-click link to eBay's sold search for each lot**, so judging value takes a
-couple of seconds per item. Automating it later is possible — see *Roadmap*.
+## Turn on value estimates — the free eBay API key
 
-## Important: run it from a normal home connection
+1. Sign up (free) at **developer.ebay.com** and sign in.
+2. Go to **Your Account → Application Keysets**.
+3. Under **Production** (not Sandbox), create a keyset. Copy:
+   - **App ID (Client ID)** → `EBAY_CLIENT_ID`
+   - **Cert ID (Client Secret)** → `EBAY_CLIENT_SECRET`
+4. Paste those two into Render's environment variables and redeploy.
 
-HiBid blocks traffic that looks non-residential. In testing, an **office/VPN
-network returned nothing**, while **home wifi and a phone hotspot worked
-perfectly**. So run this on a machine connected to ordinary home internet — not a
-corporate network or VPN.
+The app uses the Browse API's app-token flow — no buyer login or approval needed
+for basic search, and the free rate limits are far more than this app will use.
 
-## Setup (one time)
+## Moving to Railway later (when you want always-on)
 
-You need Python 3.9+.
+Because the backend is stateless, migrating is: create a Railway project from the
+same GitHub repo, copy the same environment variables over, deploy. Nothing to
+export, no data to lose. Railway stays awake (no cold-start), for a few $/month.
+
+## Local development
 
 ```bash
-git clone https://github.com/peytoncarey98-debug/estate-sale-arbitrage.git
-cd estate-sale-arbitrage
-
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-cp config.example.yaml config.yaml # then edit config.yaml (see below)
+# optional: export EBAY_CLIENT_ID=... EBAY_CLIENT_SECRET=... to test valuation
+python app.py           # http://127.0.0.1:5000  (no password locally)
 ```
 
-### Edit `config.yaml`
+## How it works / files
 
-| Setting | What it does |
-|---------|--------------|
-| `watchlist` | The keywords to search HiBid for. One search each. |
-| `hibid_pages_per_keyword` | Pages to scan per keyword (~100 lots/page). |
-| `max_current_bid` | Only include lots at/below this bid (arbitrage = still cheap). `null` = no cap. |
-| `max_lots_per_keyword` | How many lots per keyword to put in the email. |
-| `sort_by` | `ending_soon`, `lowest_bid`, or `fewest_bids`. |
-
-### Set up Gmail for the email digest
-
-Gmail needs an **app password** (not your normal password):
-
-1. Turn on 2-Step Verification: https://myaccount.google.com/security
-2. Create an app password: https://myaccount.google.com/apppasswords
-   (name it "estate-arb") — you'll get a 16-character code.
-3. Provide it via environment variables (never stored in the repo):
-
-```bash
-export GMAIL_ADDRESS="peyton.carey98@gmail.com"
-export GMAIL_APP_PASSWORD="the16charcode"
-```
-
-## Try it out
-
-```bash
-# 1) Confirm the HiBid scraper sees lots:
-python arb.py test-hibid "roseville pottery"
-
-# 2) Full scan with NO email — writes digest_preview.html to open in a browser:
-python arb.py run --dry-run
-
-# 3) The real thing — scan and email the digest:
-python arb.py run
-```
-
-**If `test-hibid` prints "0 lots parsed":** you're probably on a blocked network
-(office/VPN) — try home wifi or a phone hotspot. If it still fails on a clean
-connection, run `python arb.py test-hibid "roseville pottery" --dump` and send me
-`hibid_dump.html`.
-
-## Schedule it to run automatically
-
-Create a `run.sh` next to `arb.py` (it's gitignored, so your password stays
-private):
-
-```bash
-#!/bin/bash
-cd "$(dirname "$0")"
-source .venv/bin/activate
-export GMAIL_ADDRESS="peyton.carey98@gmail.com"
-export GMAIL_APP_PASSWORD="the16charcode"
-python arb.py run >> arb.log 2>&1
-```
-
-`chmod +x run.sh`, then:
-
-**macOS / Linux (cron)** — run at 8am and 6pm daily. `crontab -e`, add:
-```
-0 8,18 * * * /full/path/to/estate-sale-arbitrage/run.sh
-```
-The machine must be **awake and on home wifi** at those times — a MacBook that's
-open during the day is ideal.
-
-**Windows (Task Scheduler)** — Create Task → daily trigger → Action: run
-`python arb.py run` with "Start in" set to the repo folder (use a `run.bat`
-wrapper for the `GMAIL_...` variables).
-
-## Running on more than one machine
-
-Each machine is independent. On every computer (e.g. a Chromebook and a MacBook):
-clone the repo, make a venv, `pip install -r requirements.txt`, copy
-`config.example.yaml` to `config.yaml` and set its own watchlist + `email.to`, and
-set its own `GMAIL_ADDRESS`/`GMAIL_APP_PASSWORD`. Because `config.yaml` is
-gitignored, each person can have a different watchlist. Put the automated schedule
-on the machine that's reliably awake on home wifi (a MacBook beats a Chromebook,
-whose Linux container sleeps). `git pull` updates the tool on any machine.
-
-## Files
-
-| File | What it does |
-|------|--------------|
-| `arb.py` | CLI + watchlist logic (`run`, `test-hibid`) |
+| File | Role |
+|------|------|
+| `app.py` | Flask app: routes, auth, `/api/scan` (HiBid + eBay → JSON) |
+| `templates/index.html` | The UI (watchlist, scan, cards/list, value + signals) |
+| `templates/login.html` | Password gate |
 | `hibid.py` | Scrapes HiBid open-auction lots |
 | `net.py` | Browser-impersonating HTTP so HiBid doesn't block us |
+| `ebay_api.py` | eBay Browse API client — value estimate from live listings |
 | `ebay_comps.py` | Builds eBay sold-listing search links |
-| `digest.py` | Builds the HTML digest and sends it via Gmail |
-| `config.example.yaml` | Template config — copy to `config.yaml` |
+| `render.yaml`, `Procfile` | Deployment config |
+
+`arb.py` / `digest.py` remain from the earlier command-line version and are kept
+for a future scheduled-email feature; the web app doesn't use them.
+
+## Notes
+
+- **Run the server on a host HiBid allows.** HiBid blocked a corporate/VPN network
+  in testing but works from normal connections and cloud hosts. If a scan returns
+  a HiBid error, that's the thing to check.
+- **Est. value is an asking-price signal, not a sold price** — eBay's true sold
+  data is behind their paid API. Treat estimates as a starting point; the per-lot
+  eBay sold link is there to confirm.
 
 ## Roadmap
 
-- **Automated eBay valuation** (optional, later): via eBay's free official API
-  (reliable, but current asking prices rather than sold), or a paid scraping
-  service (true sold comps, hands-off). The digest's per-lot links are the manual
-  version of this.
-- Track lots across runs so you're only alerted once per lot.
-- Add more sources (AuctionNinja, EstateSales.net) behind the same interface.
+- Scheduled email digest (needs the always-on host + a little persistence).
+- Track lots across scans so you only see each once.
+- More auction sources (AuctionNinja, EstateSales.net) — the UI is already source-aware.
