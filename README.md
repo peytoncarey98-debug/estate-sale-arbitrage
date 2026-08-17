@@ -52,8 +52,18 @@ python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
+# eBay valuation drives a real headless browser (Playwright). Install it:
+playwright install chromium
+# Linux / ChromeOS ONLY -- install Chromium's system libraries (macOS skips this):
+sudo .venv/bin/playwright install-deps chromium
+
 cp config.example.yaml config.yaml # then edit config.yaml (see below)
 ```
+
+> **Why a browser for eBay?** HiBid is fetched with a fast lightweight client,
+> but eBay blocks lightweight clients even from a home connection, so eBay pages
+> are loaded through a real headless Chrome. That's what the two `playwright`
+> commands above set up. HiBid needs none of it.
 
 ### Edit `config.yaml`
 

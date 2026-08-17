@@ -15,9 +15,10 @@ import urllib.parse
 
 from bs4 import BeautifulSoup
 
-import net
+import browser
 
 SEARCH_URL = "https://www.ebay.com/sch/i.html"
+RESULTS_SELECTOR = "li.s-item, li.brwrvr__item-card, div.s-card, div.su-card-container"
 MONEY_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 
 
@@ -33,12 +34,14 @@ BLOCK_MARKERS = (
     "are you a human",
     "px-captcha",
     "checking your browser",
+    "error page",  # eBay's tiny stub when it refuses the request
 )
 
 
 def sold_url(query):
     """Human URL for eBay sold/completed listings -- handy for manual checks."""
-    q = urllib.parse.urlencode({"_nkw": query, "LH_Sold": 1, "LH_Complete": 1, "_sop": 13})
+    q = urllib.parse.urlencode({"_nkw": query, "LH_Sold": 1, "LH_Complete": 1,
+                                "_sop": 13, "_ipg": 60})
     return f"{SEARCH_URL}?{q}"
 
 
@@ -47,21 +50,18 @@ def _first_price(text):
     return float(m.group(1).replace(",", "")) if m else None
 
 
-def raw(query, session=None, timeout=30):
-    """Return the raw HTML of an eBay sold search (no block check -- for dumps)."""
-    session = session or net.session(warmup="https://www.ebay.com/")
-    params = {"_nkw": query, "LH_Sold": 1, "LH_Complete": 1, "_sop": 13, "_ipg": 60}
-    r = session.get(SEARCH_URL, params=params, timeout=timeout)
-    r.raise_for_status()
-    return r.text
+def raw(query):
+    """Return the rendered HTML of an eBay sold search (no block check)."""
+    return browser.render(sold_url(query), wait_for=RESULTS_SELECTOR)
 
 
-def fetch_sold(query, session=None, timeout=30):
+def fetch_sold(query):
     """Return sold-search HTML, raising BlockedError on a captcha page."""
-    html = raw(query, session=session, timeout=timeout)
+    html = raw(query)
     low = html.lower()
-    if any(marker in low for marker in BLOCK_MARKERS):
-        raise BlockedError("eBay returned a security/verification page")
+    # Real results pages are large; challenge/error stubs are tiny.
+    if any(marker in low for marker in BLOCK_MARKERS) or len(html) < 8000:
+        raise BlockedError("eBay returned a security/verification/error page")
     return html
 
 

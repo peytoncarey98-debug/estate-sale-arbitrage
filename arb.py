@@ -19,6 +19,7 @@ import time
 
 import yaml
 
+import browser
 import digest
 import ebay_comps
 import hibid
@@ -160,12 +161,15 @@ def main():
     p_e.add_argument("--dump", action="store_true", help="save raw HTML for calibration")
 
     args = ap.parse_args()
-    if args.cmd == "run":
-        cmd_run(load_config(), args.dry_run)
-    elif args.cmd == "test-hibid":
-        cmd_test_hibid(args.query, args.dump)
-    elif args.cmd == "test-ebay":
-        cmd_test_ebay(args.query, args.dump)
+    try:
+        if args.cmd == "run":
+            cmd_run(load_config(), args.dry_run)
+        elif args.cmd == "test-hibid":
+            cmd_test_hibid(args.query, args.dump)
+        elif args.cmd == "test-ebay":
+            cmd_test_ebay(args.query, args.dump)
+    finally:
+        browser.shutdown()  # close the headless browser if eBay opened one
 
 
 if __name__ == "__main__":
