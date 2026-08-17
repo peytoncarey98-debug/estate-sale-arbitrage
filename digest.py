@@ -1,4 +1,4 @@
-"""Build and send the HTML email digest of flagged arbitrage lots."""
+"""Build and send the HTML email digest of watchlist matches."""
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -12,63 +12,56 @@ def _esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _num(v):
-    return f"{v:,.2f}" if isinstance(v, (int, float)) else "&mdash;"
+def _money(v):
+    return f"${v:,.2f}" if isinstance(v, (int, float)) else "&mdash;"
 
 
-def _ratio(r):
-    if r is None:
-        return "&mdash;"
-    return "&infin;" if r == float("inf") else f"{r:.1f}x"
-
-
-def _row(d):
-    lot, comp = d["lot"], d["comps"]
+def _row(lot):
     cell = 'style="padding:8px;border-top:1px solid #eee"'
-    rcell = 'style="padding:8px;border-top:1px solid #eee;text-align:right"'
-    median_cell = f"${_num(comp.get('median'))}"
-    if comp.get("url"):  # link the median to the eBay sold search behind it
-        median_cell = f'<a href="{comp["url"]}">{median_cell}</a>'
+    rcell = 'style="padding:8px;border-top:1px solid #eee;text-align:right;white-space:nowrap"'
+    ebay = lot.get("ebay_url", "#")
     return f"""<tr>
       <td {cell}><a href="{lot['url']}">{_esc(lot['title'])}</a></td>
-      <td {rcell}>${_num(lot.get('current_bid'))}</td>
-      <td {rcell}>{median_cell}</td>
-      <td {rcell}><b>${_num(d.get('margin'))}</b></td>
-      <td {rcell}>{_ratio(d.get('ratio'))}</td>
-      <td {rcell}>{comp.get('n', 0)}</td>
+      <td {rcell}>{_money(lot.get('current_bid'))}</td>
+      <td {rcell}>{lot.get('bid_count') if lot.get('bid_count') is not None else '&mdash;'}</td>
+      <td {rcell}>{_esc(lot.get('time_left') or '&mdash;')}</td>
+      <td {rcell}><a href="{ebay}">eBay sold &rarr;</a></td>
     </tr>"""
 
 
-def build_html(flagged, scanned_count, keywords):
-    if flagged:
-        head = (
-            '<tr style="text-align:left;background:#f4f4f4">'
-            '<th style="padding:8px">Lot (HiBid)</th>'
-            '<th style="padding:8px;text-align:right">Cur. bid</th>'
-            '<th style="padding:8px;text-align:right">eBay median</th>'
-            '<th style="padding:8px;text-align:right">Margin</th>'
-            '<th style="padding:8px;text-align:right">Ratio</th>'
-            '<th style="padding:8px;text-align:right"># comps</th></tr>'
-        )
-        rows = "".join(_row(d) for d in flagged)
-        table = (
-            '<table style="border-collapse:collapse;width:100%;'
-            'font:14px system-ui,Arial">'
-            f"<thead>{head}</thead><tbody>{rows}</tbody></table>"
-        )
+def _section(keyword, lots):
+    head = (
+        '<tr style="text-align:left;background:#f4f4f4">'
+        '<th style="padding:8px">Lot (HiBid)</th>'
+        '<th style="padding:8px;text-align:right">Bid</th>'
+        '<th style="padding:8px;text-align:right">Bids</th>'
+        '<th style="padding:8px;text-align:right">Time left</th>'
+        '<th style="padding:8px;text-align:right">Value check</th></tr>'
+    )
+    if not lots:
+        body = ('<tr><td style="padding:8px;color:#999" colspan="5">'
+                'No matching lots right now.</td></tr>')
     else:
-        table = "<p>No lots cleared the thresholds this run.</p>"
+        body = "".join(_row(l) for l in lots)
+    return f"""<h3 style="margin:22px 0 6px">{_esc(keyword)} &mdash; {len(lots)}</h3>
+      <table style="border-collapse:collapse;width:100%;font:14px system-ui,Arial">
+        <thead>{head}</thead><tbody>{body}</tbody></table>"""
 
-    return f"""<div style="font:14px system-ui,Arial;color:#222;max-width:820px">
-      <h2 style="margin:0 0 4px">Estate-Sale Arbitrage &mdash; {len(flagged)} flagged</h2>
-      <p style="color:#666;margin:0 0 16px">
-        Scanned {scanned_count} HiBid lots across {len(keywords)} keywords.
-        Margin = eBay median sold price &minus; current bid.
+
+def build_html(results, cfg):
+    total = sum(len(v) for v in results.values())
+    sections = "".join(_section(kw, lots) for kw, lots in results.items())
+    return f"""<div style="font:14px system-ui,Arial;color:#222;max-width:860px">
+      <h2 style="margin:0 0 4px">Estate-Sale Watchlist &mdash; {total} lots to check</h2>
+      <p style="color:#666;margin:0 0 8px">
+        Open HiBid lots matching your watchlist. Click <b>eBay sold &rarr;</b> on any
+        row to see recent sold prices for that item and judge whether the current
+        bid is a deal.
       </p>
-      {table}
+      {sections}
       <p style="color:#999;font-size:12px;margin-top:20px">
-        Comps are recent eBay <em>sold</em> listings. Always verify item
-        condition, completeness, and shipping before bidding.
+        Always check condition, completeness, and shipping on the actual lot
+        before bidding. Sold comps are a starting point, not an appraisal.
       </p>
     </div>"""
 

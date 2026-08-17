@@ -9,21 +9,19 @@ watchlist:
   - vintage pyrex
   - sterling silver flatware
 
-# A lot is flagged only when BOTH conditions are true:
-thresholds:
-  # eBay median sold price must be at least this multiple of the current bid
-  min_value_ratio: 3.0
-  # ...and estimated profit (eBay median - current bid) must be at least this many dollars
-  min_margin_dollars: 40
+# How many HiBid result pages to scan per keyword (~100 lots per page)
+hibid_pages_per_keyword: 1
 
-# How many HiBid result pages to scan per keyword (~25 lots per page)
-hibid_pages_per_keyword: 2
+# Only include lots at or below this current bid (arbitrage = still cheap).
+# Set to null for no cap.
+max_current_bid: 50
 
-ebay:
-  min_comp_price: 5     # ignore sold comps below this (junk/noise)
-  max_comps: 20         # use at most this many recent comps for the median
+# Cap how many lots per keyword appear in the email.
+max_lots_per_keyword: 15
+
+# Order lots within each keyword: ending_soon | lowest_bid | fewest_bids
+sort_by: ending_soon
 
 email:
   to: "peyton.carey98@gmail.com"
-  subject_prefix: "[Estate Arb]"
-  flagged_only: true    # reserved for future use; v1 only reports flagged lots
+  subject_prefix: "[Estate Watch]"

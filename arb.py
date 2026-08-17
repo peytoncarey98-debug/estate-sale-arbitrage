@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
-"""Estate-sale arbitrage scanner.
+"""Estate-sale watchlist scanner.
 
-Scans HiBid open auctions for your watchlist keywords, values each lot against
-recent eBay sold comps, flags lots whose likely resale value beats the current
-bid, and emails you a digest.
+Scans HiBid open auctions for your watchlist keywords and emails you a digest of
+matching lots -- current bid, bids, time left, a link to the lot, and a one-click
+link to eBay's SOLD listings so you can eyeball resale value.
+
+(eBay blocks automated price scraping, so valuation is one click away rather than
+computed for you. See README for why, and options to automate it later.)
 
 Usage:
-  python arb.py test-hibid "roseville pottery"   # sanity-check the HiBid scraper
-  python arb.py test-ebay  "roseville vase"       # sanity-check the eBay comps
-  python arb.py run --dry-run                       # full scan, preview, no email
-  python arb.py run                                  # full scan, email the digest
+  python arb.py test-hibid "roseville pottery"   # check the HiBid scraper
+  python arb.py run --dry-run                       # scan + preview to a file
+  python arb.py run                                  # scan + email the digest
 """
 import argparse
 import os
-import re
 import sys
-import time
 
 import yaml
 
-import browser
 import digest
 import ebay_comps
 import hibid
+
+# How to order lots within each keyword section of the digest.
+SORTERS = {
+    "ending_soon": lambda l: l.get("end_minutes") if l.get("end_minutes") is not None else 10**12,
+    "lowest_bid": lambda l: l.get("current_bid") if l.get("current_bid") is not None else 10**12,
+    "fewest_bids": lambda l: l.get("bid_count") if l.get("bid_count") is not None else 10**12,
+}
 
 
 def load_config(path="config.yaml"):
@@ -32,93 +38,54 @@ def load_config(path="config.yaml"):
         return yaml.safe_load(f)
 
 
-def clean_query(title):
-    """Trim lot numbers / punctuation so eBay comps match the item itself."""
-    t = re.sub(r"lot\s*#?\s*\d+", " ", title, flags=re.I)
-    t = re.sub(r"\b[A-Za-z]?\d{2,}-\d+\b", " ", t)  # model numbers like 72-6
-    t = re.sub(r"[^\w\s]", " ", t)
-    t = re.sub(r"\s+", " ", t).strip()
-    return " ".join(t.split()[:8])  # first ~8 words is plenty for a comp search
-
-
-def evaluate(lot, cfg):
-    """Attach eBay comps + margin/ratio to a single HiBid lot."""
-    ecfg = cfg.get("ebay", {})
-    comp = ebay_comps.comps(
-        clean_query(lot["title"]),
-        min_price=ecfg.get("min_comp_price", 5),
-        max_comps=ecfg.get("max_comps", 20),
-    )
-    bid = lot.get("current_bid")
-    res = {"lot": lot, "comps": comp, "margin": None, "ratio": None}
-    if comp["median"]:
-        if bid and bid > 0:
-            res["margin"] = round(comp["median"] - bid, 2)
-            res["ratio"] = comp["median"] / bid
-        else:  # no bids yet -- the whole median is upside
-            res["margin"] = comp["median"]
-            res["ratio"] = float("inf")
-    return res
-
-
-def is_flagged(res, cfg):
-    th = cfg.get("thresholds", {})
-    if res["margin"] is None or res["ratio"] is None:
-        return False
-    return (
-        res["ratio"] >= th.get("min_value_ratio", 3.0)
-        and res["margin"] >= th.get("min_margin_dollars", 40)
-    )
-
-
-def cmd_run(cfg, dry_run):
-    keywords = cfg.get("watchlist", [])
+def collect(cfg):
+    """Return {keyword: [lot, ...]} of watchlist matches, filtered and sorted."""
     pages = cfg.get("hibid_pages_per_keyword", 2)
-    scanned, blocked, flagged = 0, 0, []
+    cap = cfg.get("max_lots_per_keyword", 15)
+    max_bid = cfg.get("max_current_bid")  # None -> no cap
+    sorter = SORTERS.get(cfg.get("sort_by", "ending_soon"), SORTERS["ending_soon"])
 
-    for kw in keywords:
+    results = {}
+    for kw in cfg.get("watchlist", []):
         try:
             lots = hibid.search(kw, pages=pages)
         except Exception as e:
             print(f"  ! HiBid search failed for {kw!r}: {e}")
+            results[kw] = []
             continue
-        print(f"  {kw!r}: {len(lots)} lots")
-        for lot in lots:
-            scanned += 1
-            try:
-                res = evaluate(lot, cfg)
-            except Exception as e:
-                print(f"    ! eBay lookup failed for {lot['title'][:40]!r}: {e}")
-                continue
-            if res["comps"].get("blocked"):
-                blocked += 1
-            if is_flagged(res, cfg):
-                flagged.append(res)
-                print(f"    * ${res['margin']} margin: {lot['title'][:60]}")
-            time.sleep(1.0)  # be polite to eBay
+        if max_bid is not None:
+            lots = [l for l in lots if (l.get("current_bid") or 0) <= max_bid]
+        lots.sort(key=sorter)
+        lots = lots[:cap]
+        for l in lots:
+            l["ebay_url"] = ebay_comps.sold_url(hibid.clean_title(l["title"]))
+        results[kw] = lots
+        print(f"  {kw!r}: {len(lots)} lots (after filters)")
+    return results
 
-    if blocked:
-        print(f"\n! eBay served a captcha on {blocked} lookup(s); those lots could not be valued.")
-    flagged.sort(key=lambda r: r["margin"], reverse=True)
-    html = digest.build_html(flagged, scanned, keywords)
-    prefix = cfg.get("email", {}).get("subject_prefix", "[Estate Arb]")
-    subject = f"{prefix} {len(flagged)} deals ({scanned} scanned)"
+
+def cmd_run(cfg, dry_run):
+    results = collect(cfg)
+    total = sum(len(v) for v in results.values())
+    html = digest.build_html(results, cfg)
+    prefix = cfg.get("email", {}).get("subject_prefix", "[Estate Watch]")
+    subject = f"{prefix} {total} lots to check"
 
     if dry_run:
         with open("digest_preview.html", "w") as f:
             f.write(html)
-        print(f"\nDRY RUN: {len(flagged)} flagged of {scanned} scanned.")
+        print(f"\nDRY RUN: {total} lots across {len(results)} keywords.")
         print("Wrote digest_preview.html -- open it in a browser to preview the email.")
     else:
         digest.send(html, subject, cfg.get("email", {}).get("to"))
-        print(f"\nEmailed {len(flagged)} deals to {cfg.get('email', {}).get('to')}.")
+        print(f"\nEmailed {total} lots to {cfg.get('email', {}).get('to')}.")
 
 
 def cmd_test_hibid(query, dump):
     lots = hibid.search(query, pages=1)
     print(f"Parsed {len(lots)} lots for {query!r}:")
     for lot in lots[:15]:
-        print(f"  ${lot.get('current_bid')}  ({lot.get('bid_count')} bids)  {lot['title'][:70]}")
+        print(f"  ${lot.get('current_bid')}  ({lot.get('bid_count')} bids, {lot.get('time_left')})  {lot['title'][:60]}")
         print(f"     {lot['url']}")
     if not lots and dump:
         with open("hibid_dump.html", "w") as f:
@@ -126,27 +93,8 @@ def cmd_test_hibid(query, dump):
         print("0 lots parsed -- wrote hibid_dump.html so the parser can be calibrated.")
 
 
-def cmd_test_ebay(query, dump=False):
-    c = ebay_comps.comps(query)
-    if c["blocked"]:
-        print(f"eBay BLOCKED (captcha/security page) for {query!r}.")
-        print("Common from datacenter/VPN IPs, rare from home wifi. If you're on")
-        print("home internet and still see this, tell me and we'll change tactics.")
-    elif c["n"]:
-        print(f"eBay sold comps for {query!r}: n={c['n']} median=${c['median']}")
-        print(f"  range ${c['low']}-${c['high']}")
-        print(f"  prices: {c['prices']}")
-    else:
-        print(f"eBay returned a real page for {query!r} but parsed 0 comps.")
-        print("Run again with --dump and send me ebay_dump.html to calibrate the parser.")
-    if dump:
-        with open("ebay_dump.html", "w") as f:
-            f.write(ebay_comps.raw(query))
-        print("wrote ebay_dump.html")
-
-
 def main():
-    ap = argparse.ArgumentParser(description="Estate-sale arbitrage scanner")
+    ap = argparse.ArgumentParser(description="Estate-sale watchlist scanner")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p_run = sub.add_parser("run", help="scan the watchlist and email the digest")
@@ -156,20 +104,11 @@ def main():
     p_h.add_argument("query")
     p_h.add_argument("--dump", action="store_true", help="save raw HTML if 0 lots parse")
 
-    p_e = sub.add_parser("test-ebay", help="check eBay sold comps for one query")
-    p_e.add_argument("query")
-    p_e.add_argument("--dump", action="store_true", help="save raw HTML for calibration")
-
     args = ap.parse_args()
-    try:
-        if args.cmd == "run":
-            cmd_run(load_config(), args.dry_run)
-        elif args.cmd == "test-hibid":
-            cmd_test_hibid(args.query, args.dump)
-        elif args.cmd == "test-ebay":
-            cmd_test_ebay(args.query, args.dump)
-    finally:
-        browser.shutdown()  # close the headless browser if eBay opened one
+    if args.cmd == "run":
+        cmd_run(load_config(), args.dry_run)
+    elif args.cmd == "test-hibid":
+        cmd_test_hibid(args.query, args.dump)
 
 
 if __name__ == "__main__":
