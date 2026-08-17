@@ -23,10 +23,16 @@ watchlist keywords
 
 ## Important notes before you start
 
-- **Run it from your own machine, not a server.** HiBid and eBay block
-  datacenter IPs (Cloudflare 403). Your home/office internet is a residential IP
-  and works fine. This is why the tool is a local scheduled script rather than a
-  cloud job.
+- **Run it from your own machine, not a server.** HiBid and eBay block automated
+  traffic by fingerprinting the HTTP client. The tool uses `curl_cffi` to
+  impersonate a real Chrome browser, which gets past HiBid everywhere. eBay is
+  stricter and also weighs IP reputation: it usually lets a **residential**
+  connection (your home/office wifi) through but challenges datacenter/VPN IPs
+  with a captcha. That's the main reason this runs locally, not in the cloud.
+- **eBay comps can intermittently get blocked.** If eBay serves a captcha, the
+  tool detects it, skips valuing that lot, and tells you at the end of the run
+  instead of crashing. Run `python arb.py test-ebay "some item"` to see whether
+  your connection is being let through.
 - **It scrapes public pages.** eBay's true "sold" prices aren't in their free API,
   and HiBid has no public buyer API, so the tool reads public search-results
   pages. Keep the schedule modest (a few runs a day) to stay a polite guest.
@@ -89,6 +95,11 @@ python arb.py run --dry-run
 python arb.py run
 ```
 
+**If `test-ebay` says "BLOCKED":** eBay is challenging your connection. It's
+often intermittent — try again, or from a different network. **If it says it got
+a real page but parsed 0 comps**, run `python arb.py test-ebay "roseville pottery vase" --dump`
+and send me `ebay_dump.html` so I can match the parser to eBay's current markup.
+
 **If `test-hibid` prints "0 lots parsed":** run
 `python arb.py test-hibid "roseville pottery" --dump`, which saves
 `hibid_dump.html`. Send me that file and I'll calibrate the parser to HiBid's
@@ -122,6 +133,25 @@ during the day is fine.)
 Start a program → `python`, arguments `arb.py run`, "Start in" set to the repo
 folder. Put the two `set GMAIL_...` lines in a `run.bat` wrapper instead of the
 `.sh` if you prefer.
+
+## Running on more than one machine
+
+Each machine is fully independent — nothing syncs automatically, which is the
+point. On every computer that should run it (e.g. a Chromebook and a MacBook):
+
+1. `git clone` the repo, make a venv, `pip install -r requirements.txt`.
+2. `cp config.example.yaml config.yaml` and set that machine's own watchlist and
+   `email.to`. Because `config.yaml` is gitignored, each person can have a
+   different watchlist and recipient — or paste in the same one to match.
+3. Set that machine's own `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` (each Gmail
+   account needs its own app password).
+
+**Which machine should run the schedule?** A machine that's reliably awake and
+whose OS keeps cron/launchd running — a MacBook is a better fit than a Chromebook
+(whose Linux container sleeps). Treat a Chromebook as a place for on-demand
+`python arb.py run --dry-run` checks rather than the automated digest.
+
+To pull the latest version of the tool on any machine later: `git pull`.
 
 ## Files
 

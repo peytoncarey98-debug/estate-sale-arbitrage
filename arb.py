@@ -73,7 +73,7 @@ def is_flagged(res, cfg):
 def cmd_run(cfg, dry_run):
     keywords = cfg.get("watchlist", [])
     pages = cfg.get("hibid_pages_per_keyword", 2)
-    scanned, flagged = 0, []
+    scanned, blocked, flagged = 0, 0, []
 
     for kw in keywords:
         try:
@@ -89,11 +89,15 @@ def cmd_run(cfg, dry_run):
             except Exception as e:
                 print(f"    ! eBay lookup failed for {lot['title'][:40]!r}: {e}")
                 continue
+            if res["comps"].get("blocked"):
+                blocked += 1
             if is_flagged(res, cfg):
                 flagged.append(res)
                 print(f"    * ${res['margin']} margin: {lot['title'][:60]}")
             time.sleep(1.0)  # be polite to eBay
 
+    if blocked:
+        print(f"\n! eBay served a captcha on {blocked} lookup(s); those lots could not be valued.")
     flagged.sort(key=lambda r: r["margin"], reverse=True)
     html = digest.build_html(flagged, scanned, keywords)
     prefix = cfg.get("email", {}).get("subject_prefix", "[Estate Arb]")
@@ -121,12 +125,23 @@ def cmd_test_hibid(query, dump):
         print("0 lots parsed -- wrote hibid_dump.html so the parser can be calibrated.")
 
 
-def cmd_test_ebay(query):
+def cmd_test_ebay(query, dump=False):
     c = ebay_comps.comps(query)
-    print(f"eBay sold comps for {query!r}: n={c['n']} median=${c['median']}")
-    if c["n"]:
+    if c["blocked"]:
+        print(f"eBay BLOCKED (captcha/security page) for {query!r}.")
+        print("Common from datacenter/VPN IPs, rare from home wifi. If you're on")
+        print("home internet and still see this, tell me and we'll change tactics.")
+    elif c["n"]:
+        print(f"eBay sold comps for {query!r}: n={c['n']} median=${c['median']}")
         print(f"  range ${c['low']}-${c['high']}")
         print(f"  prices: {c['prices']}")
+    else:
+        print(f"eBay returned a real page for {query!r} but parsed 0 comps.")
+        print("Run again with --dump and send me ebay_dump.html to calibrate the parser.")
+    if dump:
+        with open("ebay_dump.html", "w") as f:
+            f.write(ebay_comps.raw(query))
+        print("wrote ebay_dump.html")
 
 
 def main():
@@ -142,6 +157,7 @@ def main():
 
     p_e = sub.add_parser("test-ebay", help="check eBay sold comps for one query")
     p_e.add_argument("query")
+    p_e.add_argument("--dump", action="store_true", help="save raw HTML for calibration")
 
     args = ap.parse_args()
     if args.cmd == "run":
@@ -149,7 +165,7 @@ def main():
     elif args.cmd == "test-hibid":
         cmd_test_hibid(args.query, args.dump)
     elif args.cmd == "test-ebay":
-        cmd_test_ebay(args.query)
+        cmd_test_ebay(args.query, args.dump)
 
 
 if __name__ == "__main__":

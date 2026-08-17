@@ -26,10 +26,13 @@ def _row(d):
     lot, comp = d["lot"], d["comps"]
     cell = 'style="padding:8px;border-top:1px solid #eee"'
     rcell = 'style="padding:8px;border-top:1px solid #eee;text-align:right"'
+    median_cell = f"${_num(comp.get('median'))}"
+    if comp.get("url"):  # link the median to the eBay sold search behind it
+        median_cell = f'<a href="{comp["url"]}">{median_cell}</a>'
     return f"""<tr>
       <td {cell}><a href="{lot['url']}">{_esc(lot['title'])}</a></td>
       <td {rcell}>${_num(lot.get('current_bid'))}</td>
-      <td {rcell}>${_num(comp.get('median'))}</td>
+      <td {rcell}>{median_cell}</td>
       <td {rcell}><b>${_num(d.get('margin'))}</b></td>
       <td {rcell}>{_ratio(d.get('ratio'))}</td>
       <td {rcell}>{comp.get('n', 0)}</td>
