@@ -12,6 +12,7 @@ Environment:
 """
 import functools
 import os
+import re
 
 from flask import (Flask, jsonify, redirect, render_template, request,
                    session, url_for)
@@ -113,10 +114,18 @@ def scan():
     except (TypeError, ValueError):
         max_bid = None
 
+    # Optional location filter: a 5-digit ZIP + radius (miles). Blank = nationwide.
+    zip_code = str(data.get("zip") or "").strip()
+    zip_code = zip_code if re.fullmatch(r"\d{5}", zip_code) else None
+    try:
+        miles = int(data.get("miles")) if zip_code and data.get("miles") else None
+    except (TypeError, ValueError):
+        miles = None
+
     results = []
     for kw in watch:
         try:
-            lots = hibid.search(kw, pages=1)
+            lots = hibid.search(kw, pages=1, zip_code=zip_code, miles=miles)
         except Exception as e:
             results.append({"keyword": kw, "error": f"HiBid fetch failed: {e}", "lots": []})
             continue

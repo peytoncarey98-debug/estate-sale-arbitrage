@@ -67,10 +67,17 @@ def clean_title(title):
     return " ".join(t.split()[:8])
 
 
-def fetch(query, page=1, session=None, timeout=30):
-    """Return the raw HTML of one HiBid search results page."""
+def fetch(query, page=1, session=None, timeout=30, zip_code=None, miles=None):
+    """Return the raw HTML of one HiBid search results page.
+
+    Pass zip_code (+ optional miles radius, default 50) to limit results to
+    auctions near that ZIP -- HiBid does the distance filtering server-side.
+    """
     session = session or net.session()
     params = {"q": query, "status": "OPEN", "pageNumber": page}
+    if zip_code:
+        params["zip"] = zip_code
+        params["miles"] = miles or 50
     r = session.get(SEARCH_URL, params=params, timeout=timeout)
     r.raise_for_status()
     return r.text
@@ -115,12 +122,15 @@ def parse_lots(html):
     return list(lots.values())
 
 
-def search(query, pages=1, pause=1.5):
-    """Search HiBid for `query`, returning a list of lot dicts."""
+def search(query, pages=1, pause=1.5, zip_code=None, miles=None):
+    """Search HiBid for `query`, returning a list of lot dicts.
+
+    zip_code (+ miles radius) limits results to auctions near that ZIP.
+    """
     s = net.session()
     out = []
     for p in range(1, pages + 1):
-        lots = parse_lots(fetch(query, page=p, session=s))
+        lots = parse_lots(fetch(query, page=p, session=s, zip_code=zip_code, miles=miles))
         out.extend(lots)
         if not lots:
             break

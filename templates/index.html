@@ -199,6 +199,21 @@
         <input type="number" id="maxBid" value="150" min="0" step="10">
       </div>
       <div class="field">
+        <label for="zip">Near ZIP <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></label>
+        <input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="e.g. 44113" style="width:110px">
+      </div>
+      <div class="field">
+        <label for="miles">Within</label>
+        <select id="miles">
+          <option value="25">25 mi</option>
+          <option value="50">50 mi</option>
+          <option value="100">100 mi</option>
+          <option value="150">150 mi</option>
+          <option value="250">250 mi</option>
+          <option value="500">500 mi</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="sort">Sort by</label>
         <select id="sort">
           <option value="deal">Best deal</option>
@@ -280,7 +295,8 @@ async function scan(){
   btn.insertAdjacentHTML("afterbegin",'<span class="spin" id="sp"></span>');
   try{
     const res=await fetch("/api/scan",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({watchlist:watch, maxBid:$("maxBid").value, cap:20})});
+      body:JSON.stringify({watchlist:watch, maxBid:$("maxBid").value,
+        zip:$("zip").value, miles:$("miles").value, cap:20})});
     if(res.status===401){ location.href="/login"; return; }
     if(!res.ok) throw new Error("server "+res.status);
     const data=await res.json();
@@ -385,6 +401,11 @@ $("sort").value = LS.get("ls.sort","deal");
 $("sort").addEventListener("change",()=>{ LS.set("ls.sort",$("sort").value); if(lastResults) render(); });
 $("maxBid").value = LS.get("ls.maxbid",150);
 $("maxBid").addEventListener("change",()=>LS.set("ls.maxbid",$("maxBid").value));
+$("zip").value = LS.get("ls.zip","");
+$("miles").value = LS.get("ls.miles","50");
+$("zip").addEventListener("input",()=>{ $("zip").value=$("zip").value.replace(/\D/g,"").slice(0,5); });
+$("zip").addEventListener("change",()=>{ LS.set("ls.zip",$("zip").value); markDirty(); });
+$("miles").addEventListener("change",()=>{ LS.set("ls.miles",$("miles").value); markDirty(); });
 $("viewSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b) return;
   view=b.dataset.v; LS.set("ls.view",view);

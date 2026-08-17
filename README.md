@@ -7,6 +7,7 @@ current bid is — as cards or a dense list. No install for the people using it.
 
 - **HiBid** is scanned server-side (browser-impersonating fetch; no eBay-style blocking).
 - **eBay valuation** uses eBay's **official Browse API** — sanctioned, never captcha-blocked, works from a server. It reports the median current *asking* price as a value signal.
+- **Location filter**: optionally limit results to auctions within a mile radius of a ZIP code (HiBid does the distance filtering server-side) — handy for lots you want to pick up locally.
 - **Stateless backend**: your watchlist lives in the browser and is sent with each scan, so there's no database and moving hosts is trivial.
 
 ## Deploy it free (Render)
